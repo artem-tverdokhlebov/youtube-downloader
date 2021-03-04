@@ -6,6 +6,25 @@ use Curl\Response;
 
 abstract class HttpResponse
 {
+    private $statusCode = null;
+    private $responseBody = null;
+
+    public function getStatusCode()
+    {
+        return $this->statusCode;
+    }
+
+    public function setStatusCode($statusCode)
+    {
+        $this->statusCode = $statusCode;
+    }
+
+    public function setResponseBody($responseBody)
+    {
+        $this->responseBody = $responseBody;
+        $this->json = json_decode($responseBody, true);
+    }
+
     /**
      * @var Response
      */
@@ -14,10 +33,12 @@ abstract class HttpResponse
     // Will become null if response contents cannot be decoded from JSON
     private $json;
 
-    public function __construct(Response $response)
+    public function __construct(Response $response = null)
     {
-        $this->response = $response;
-        $this->json = json_decode($response->body, true);
+        if ($response) {
+            $this->response = $response;
+            $this->json = json_decode($response->body, true);
+        }
     }
 
     public function getResponse()
@@ -30,7 +51,7 @@ abstract class HttpResponse
      */
     public function getResponseBody()
     {
-        return $this->response->body;
+        return $this->responseBody ?? $this->response->body;
     }
 
     /**
@@ -43,6 +64,6 @@ abstract class HttpResponse
 
     public function isStatusOkay()
     {
-        return $this->getResponse()->status == 200;
+        return ($this->statusCode ?? $this->getResponse()->status) == 200;
     }
 }

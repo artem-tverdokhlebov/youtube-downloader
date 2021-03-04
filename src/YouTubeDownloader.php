@@ -2,6 +2,7 @@
 
 namespace YouTube;
 
+use http\Client\Response;
 use YouTube\Models\StreamFormat;
 use YouTube\Exception\TooManyRequestsException;
 use YouTube\Exception\VideoPlayerNotFoundException;
@@ -86,6 +87,16 @@ class YouTubeDownloader
     {
         $js_code = $player->getResponseBody();
 
+        $hlsManifestUrl = Utils::arrayGet($player_response, 'streamingData.hlsManifestUrl', null);
+
+        if ($hlsManifestUrl) {
+            return [
+                new StreamFormat([
+                    'url' => $hlsManifestUrl
+                ])
+            ];
+        }
+
         $formats = Utils::arrayGet($player_response, 'streamingData.formats', []);
 
         // video only or audio only streams
@@ -108,9 +119,8 @@ class YouTubeDownloader
             }
 
             $cipherArray = Utils::parseQueryString($cipher);
-
             $url = Utils::arrayGet($cipherArray, 'url');
-            $sp = Utils::arrayGet($cipherArray, 'sp'); // used to be 'sig'
+            $sp = Utils::arrayGet($cipherArray, 'sp', Utils::arrayGet($cipherArray, 'sp', 'sig')); // used to be 'sig'
             $signature = Utils::arrayGet($cipherArray, 's');
 
             $decoded_signature = (new SignatureDecoder())->decode($signature, $js_code);
@@ -135,7 +145,13 @@ class YouTubeDownloader
      */
     public function getDownloadLinks($video_id, $options = array())
     {
-        $page = $this->getPage($video_id);
+        if (isset($options['page_html'])) {
+            $page = new WatchVideoPage();
+            $page->setResponseBody($options['page_html']);
+            $page->setStatusCode(200);
+        } else {
+            $page = $this->getPage($video_id);
+        }
 
         if ($page->isTooManyRequests()) {
             throw new TooManyRequestsException($page);
@@ -156,10 +172,16 @@ class YouTubeDownloader
             throw new VideoPlayerNotFoundException();
         }
 
-        // get player.js location that holds signature function
-        $player_url = $page->getPlayerScriptUrl();
-        $response = $this->getBrowser()->cachedGet($player_url);
-        $player = new VideoPlayerJs($response);
+        if (isset($options['script_data'])) {
+            $player = new VideoPlayerJs();
+            $player->setResponseBody($options['script_data']);
+            $player->setStatusCode(200);
+        } else {
+            // get player.js location that holds signature function
+            $player_url = $page->getPlayerScriptUrl();
+            $response = $this->getBrowser()->cachedGet($player_url);
+            $player = new VideoPlayerJs($response);
+        }
 
         $links = $this->parseLinksFromPlayerResponse($player_response, $player);
 

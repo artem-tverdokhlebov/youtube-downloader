@@ -19,7 +19,7 @@ class WatchVideoPage extends HttpResponse
         $playerResponse = $this->getPlayerResponse();
         $playabilityStatus = Utils::arrayGet($playerResponse, 'playabilityStatus.status');
 
-        return $this->getResponse()->status == 200 && $playabilityStatus == 'OK';
+        return $this->getStatusCode() == 200 && $playabilityStatus == 'OK';
     }
 
     /**
@@ -42,11 +42,17 @@ class WatchVideoPage extends HttpResponse
     {
         // $re = '/ytplayer.config\s*=\s*([^\n]+});ytplayer/i';
         // $re = '/player_response":"(.*?)\"}};/';
-        $re = '/ytInitialPlayerResponse\s*=\s*({.+?})\s*;/i';
+//        $re = '/ytInitialPlayerResponse\s*=\s*({.+?})\s*;/i';
 
-        if (preg_match($re, $this->getResponseBody(), $matches)) {
-            $match = $matches[1];
-            return json_decode($match, true);
+//        if (preg_match($re, $this->getResponseBody(), $matches)) {
+//            $match = $matches[1];
+//            return json_decode($match, true);
+//        }
+
+        if (preg_match('/ytInitialPlayerResponse\s*=\s*({.+?})\s*;/i', $this->getResponseBody(), $matches)) {
+            return json_decode($matches[1], true);
+        } else if (preg_match('/player_response":"(.*?)\"}};/', $this->getResponseBody(), $matches)) {
+            return json_decode(stripslashes($matches[1]), true);
         }
 
         return array();
